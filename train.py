@@ -6,7 +6,8 @@ from transformers import (
     AutoTokenizer,
     AutoModelForSequenceClassification,
     TrainingArguments,
-    Trainer
+    Trainer,
+    DebertaV2Tokenizer
 )
 import torch
 from torch.utils.data import Dataset
@@ -23,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 # 1. Класс датасета
 class ReviewDataset(Dataset):
-    def __init__(self, texts, labels, tokenizer, max_length=256):
+    def __init__(self, texts, labels, tokenizer, max_length=512):
         self.encodings = tokenizer(
             texts.tolist(),
             truncation=True,
@@ -52,13 +53,13 @@ def train_model(
     num_train_epochs: int = 3,
     learning_rate: float = 2e-5,
     per_device_train_batch_size: int = 4,
-    per_device_eval_batch_size: int = 8,
+    per_device_eval_batch_size: int = 64,
     # Параметры оптимизации
     weight_decay: float = 0.01,
     gradient_accumulation_steps: int = 1,
     warmup_steps: int = 100,
     # Настройки оценки и сохранения
-    evaluation_strategy: str = "epoch",
+    eval_strategy: str = "epoch",
     eval_steps: int = None,
     save_strategy: str = "epoch",
     save_steps: int = 500,
@@ -67,7 +68,7 @@ def train_model(
     greater_is_better: bool = True,
     # Настройки логирования
     logging_dir: str = "./logs",
-    logging_steps: int = 100,
+    logging_steps: int = 30,
     logging_first_step: bool = True,
     report_to: str = "none",
     # Аппаратные настройки
@@ -126,7 +127,7 @@ def train_model(
     # Инициализация TrainingArguments
     training_args = TrainingArguments(
         output_dir=output_dir,
-        evaluation_strategy=evaluation_strategy,
+        eval_strategy=eval_strategy,
         eval_steps=eval_steps,
         learning_rate=learning_rate,
         per_device_train_batch_size=per_device_train_batch_size,
@@ -167,7 +168,7 @@ def train_model(
     
     # Инициализация модели
     logger.info("Initializing model and tokenizer...")
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    tokenizer = DebertaV2Tokenizer.from_pretrained(model_name)
     model = AutoModelForSequenceClassification.from_pretrained(
         model_name,
         num_labels=5,
@@ -221,9 +222,11 @@ if __name__ == "__main__":
     # Обучение модели
     trainer = train_model(
         train_path="data/train.csv",
-        model_name="microsoft/deberta-v2-xxlarge",
+        model_name="microsoft/deberta-v3-base",
         val_size=0.1,
         output_dir="./model",
-        num_epochs=3,
-        batch_size=4
+        num_train_epochs=10,
+        per_device_train_batch_size=16,
+        learning_rate=2e-5,
+        weight_decay=0.01
     )
